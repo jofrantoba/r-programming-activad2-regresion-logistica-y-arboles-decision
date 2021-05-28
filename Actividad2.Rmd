@@ -1,0 +1,224 @@
+---
+title: "Actividad2: Regresión logística y arboles de decisión"
+author: "Jonathan Franchesco Torres Baca @jofrantoba"
+date: "16/5/2021"
+output: html_document
+---
+
+# Ver Documentos útilizados en la práctica
+Revisar documento pdf,csv y puedes cargar el archivo en R markdown
+<a href="https://github.com/jofrantoba/r-programming-activad2-regresion-logistica-y-arboles-decision" target="_blank">Ir a enlace de recursos</a>
+
+
+## Cargando libreria
+```{r Cargando Librerias}
+library(caTools)
+library(ROCR)
+library(rpart)
+library(rpart.plot)
+library(caret, silent)
+library(e1071, silent)
+```
+
+## Cargando diabetes.csv
+```{r}
+setwd("/home/jtorres/master/Actividad 2")
+diabetes <- read.csv("diabetes.csv")
+```
+
+# Aplicando regresión logística
+
+## Pregunta 1
+¿Cuál es la precisión de nuestro modelo (valor entre 0 y 1)?
+Rpta: 0,7864583
+
+```{r}
+indicadoresRegresionLogistica <- function(tableConfusion){
+VN <- tableConfusion["0","FALSE"]
+VP <- tableConfusion["1","TRUE"]
+FP <- tableConfusion["0","TRUE"]
+FN <- tableConfusion["1","FALSE"]  
+precisionModel <- (VN+VP)/sum(tableConfusion)
+sensibilidadModel <- VP/(FN+VP)
+especificidadModel <- VN/(VN+FP)
+cat("La precisión del modelo es: ",precisionModel,"\n")
+cat("La sensibilidad del modelo es: ",sensibilidadModel,"\n")
+cat("La especificidad del modelo es: ",especificidadModel,"\n")
+}
+```
+
+
+```{r Pregunta1}
+set.seed(1000)
+split <- sample.split(diabetes$Outcome,SplitRatio = 0.75)
+train <- subset(diabetes,split==TRUE)
+test <-  subset(diabetes,split==FALSE)
+diabetesMrLogistico <- glm(Outcome~.,data=train,family="binomial")
+# summary(diabetesMrLogistico)
+predictTestDiabetes <- predict(diabetesMrLogistico,type="response",newdata=test)
+confusionMatriz <- table(test$Outcome,predictTestDiabetes>0.5)
+cat("Matriz de confusión","\n")
+print(confusionMatriz)
+indicadoresRegresionLogistica(confusionMatriz)
+```
+
+## Pregunta 2
+Pregunta 2.2: ¿Cuál es la sensibilidad del modelo (valor entre 0 y 1)?
+Rpta: 0,5970149
+
+```{r Pregunta2}
+indicadoresRegresionLogistica(confusionMatriz)
+```
+
+## Pregunta 3
+Pregunta 2.3: Supongamos que, modificando el umbral del modelo, queremos
+un nuevo modelo con una especifidad de 0.80.
+Para que eso sea posible, ¿debemos aumentar o disminuido el umbral t?
+a) Debemos aumentar t para llegar a una especifidad de 0.80
+b) Debemos disminuir t para llegar a una especifidad de 0.80
+
+Rpta: a, debemos disminuir t de 0.5 a 0.3 y 0.1
+
+## Pregunta 4
+Pregunta 2.4: ¿Qué valor(es) de t nos da(n) un mínimo de 0.8 de sensibilidad?
+(RESPUESTA MÚLTIPLE)
+a) 0.1
+b) 0.3
+c) 0.7
+d) 0.9
+
+Rpta: 0,3 y 0,1
+
+```{r Pregunta4}
+pred <- prediction(predictTestDiabetes,test$Outcome)
+ROC <- performance(pred, "tpr", "fpr")
+plot(ROC, colorize=TRUE, print.cutoffs.at=seq(0,1,by=0.1 ), text.adj=c(1.2,-0.4))
+
+print("correr el modelo con un t=0.1")
+confusionMatrizt10 <- table(test$Outcome,predictTestDiabetes>0.1)
+print(confusionMatrizt10)
+indicadoresRegresionLogistica(confusionMatrizt10)
+print("--------------------------------------------------")
+
+print("correr el modelo con un t=0.3")
+confusionMatrizt30 <- table(test$Outcome,predictTestDiabetes>0.3)
+print(confusionMatrizt30)
+indicadoresRegresionLogistica(confusionMatrizt30)
+print("--------------------------------------------------")
+
+print("correr el modelo con un t=0.7")
+confusionMatrizt70 <- table(test$Outcome,predictTestDiabetes>0.7)
+print(confusionMatrizt70)
+indicadoresRegresionLogistica(confusionMatrizt70)
+print("--------------------------------------------------")
+
+print("correr el modelo con un t=0.9")
+confusionMatrizt90 <- table(test$Outcome,predictTestDiabetes>0.9)
+print(confusionMatrizt90)
+indicadoresRegresionLogistica(confusionMatrizt90)
+print("--------------------------------------------------")
+```
+
+## Pregunta 5
+Pregunta 2.5: ¿Qué valor AUC (Area Under the ROC curve) nos proporciona
+el modelo anterior?
+
+Rpta: 0,873194
+```{r Pregunta 5}
+as.numeric(performance(pred,"auc")@y.values)
+```
+## Cargando mammals.csv
+
+```{r}
+setwd("/home/jtorres/master/Actividad 2")
+mammals <- read.csv("mammals.csv")
+set.seed(1000)
+splitMammals <- sample.split(mammals$sleep_total, SplitRatio = 0.85)
+trainMammals <- subset(mammals, splitMammals==TRUE)
+testMammals <- subset(mammals, splitMammals==FALSE)
+mammalsTree <- rpart(sleep_total ~.,data=trainMammals,method="class",minbucket=5)
+```
+## Pregunta 6
+Pregunta 2.6: Según el modelo, ¿cuántas horas duerme un animal herbívoro
+que tiene un peso de 40 para su cuerpo y 0.5 para su cerebro?
+Rpta: 5,3
+
+```{r Pregunta6}
+prp(mammalsTree)
+```
+
+## Pregunta 7
+¿Cuál es el error absoluto medio de nuestro método?
+Rpta: 3,661538
+
+```{r}
+MAE <- function(actual, predicted) { mean(abs(actual-predicted))}
+```
+
+
+```{r Pregunta7}
+mammalsPrediction <- predict(mammalsTree, newdata = testMammals, type = "class")
+mammalsPrediction <- as.numeric(as.character(mammalsPrediction))
+print(MAE(testMammals$sleep_total,mammalsPrediction))
+```
+
+## Pregunta 8
+Pregunta 2.8: ¿Qué valor cp nos indica el método como el mejor?
+Rpta: 0,05
+
+```{r Pregunta8}
+numFolds <- trainControl( method = "cv", number = 10 )
+cpGrid <- expand.grid( .cp = seq(0.01,0.1,0.005)) 
+train(sleep_total ~ ., data = trainMammals, method = "rpart", trControl = numFolds,tuneGrid=cpGrid, na.action=na.pass )
+
+```
+
+## Pregunta 9
+¿Cuál es ahora el error absoluto medio de nuestro método?
+Rpta: 3,046154
+```{r Pregunta 9}
+
+cp_optimo <- 0.05
+mammalsTreeCV <- rpart(sleep_total~., data=trainMammals, method="class", cp=cp_optimo)
+
+mammalsPredictionCV <- predict(mammalsTreeCV, newdata = testMammals, type = "class")
+mammalsPredictionCV <- as.numeric(as.character(mammalsPredictionCV))
+print(MAE(testMammals$sleep_total,mammalsPredictionCV))
+```
+
+## Pregunta 10
+En la instrucción
+randomForest(target ~ ., data = train, ntree=200, nodesize=25)
+el parámetro ntree= 200 indica que:
+a) Se generará un árbol de 200 niveles de profundidad.
+b) Se generarán 200 árboles aleatorios y se escogerá el que tenga el valor
+AUC (Area Under the ROC curve) más grande.
+c) Se generarán 200 árboles aleatorios y se escogerá el que tenga mejor
+precisión global.
+d) Se generarán 200 árboles aleatorios y se predecirá escogiendo el valor más
+repetido en la predicción de cada uno de ellos
+
+Rpta: d
+
+## Linkografía
+
+<a href="http://adv-r.had.co.nz/Rcpp.html" target="_blank">http://adv-r.had.co.nz/Rcpp.html</a>
+
+<a href="https://www.youtube.com/watch?v=qcvAqAH60Yw" target="_blank">https://www.youtube.com/watch?v=qcvAqAH60Yw</a>
+
+<a href="https://www.youtube.com/channel/UCtYLUTtgS3k1Fg4y5tAhLbw" target="_blank">https://www.youtube.com/channel/UCtYLUTtgS3k1Fg4y5tAhLbw</a>
+
+<a href="https://github.com/StatQuest/roc_and_auc_demo/blob/master/roc_and_auc_demo.R" target="_blank">https://github.com/StatQuest/roc_and_auc_demo/blob/master/roc_and_auc_demo.R</a>
+
+<a href="https://www.displayr.com/extracting-results-from-tables-as-r-outputs/" target="_blank">https://www.displayr.com/extracting-results-from-tables-as-r-outputs/</a>
+
+<a href="https://www.geeksforgeeks.org/convert-an-object-into-a-vector-in-r-programming-as-vector-function/" target="_blank">https://www.geeksforgeeks.org/convert-an-object-into-a-vector-in-r-programming-as-vector-function/</a>
+
+<a href="https://www.datacamp.com/community/tutorials/matrices-in-r?utm_source=adwords_ppc&utm_campaignid=1455363063&utm_adgroupid=65083631748&utm_device=c&utm_keyword=&utm_matchtype=b&utm_network=g&utm_adpostion=&utm_creative=278443377095&utm_targetid=dsa-429603003980&utm_loc_interest_ms=&utm_loc_physical_ms=9073192&gclid=CjwKCAjwhYOFBhBkEiwASF3KGS01bOjg0SAVHYNlcGhB0SZD_WMHEVtAHQSDrXoQfJlyAW9GNtJgthoC1QcQAvD_BwE" target="_blank">https://www.datacamp.com/community/tutorials/matrices-in-r?utm_source=adwords_ppc&utm_campaignid=1455363063&utm_adgroupid=65083631748&utm_device=c&utm_keyword=&utm_matchtype=b&utm_network=g&utm_adpostion=&utm_creative=278443377095&utm_targetid=dsa-429603003980&utm_loc_interest_ms=&utm_loc_physical_ms=9073192&gclid=CjwKCAjwhYOFBhBkEiwASF3KGS01bOjg0SAVHYNlcGhB0SZD_WMHEVtAHQSDrXoQfJlyAW9GNtJgthoC1QcQAvD_BwE</a>
+
+<a href="https://www.geeksforgeeks.org/convert-an-object-into-a-matrix-in-r-programming-as-matrix-function/" target="_blank">https://www.geeksforgeeks.org/convert-an-object-into-a-matrix-in-r-programming-as-matrix-function/</a>
+
+
+<a href="https://rpubs.com/Cesar_AHN/operaciones_con_vectores_aritmeticas_estadisticas_graficos" target="_blank">https://rpubs.com/Cesar_AHN/operaciones_con_vectores_aritmeticas_estadisticas_graficos</a>
+
+
